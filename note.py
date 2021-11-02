@@ -23,6 +23,7 @@ class Note(QWidget):
         # Зададим размер и положение нашего виджета,
         self.setGeometry(random.randint(0, GetSystemMetrics(0) - 300), random.randint(0, GetSystemMetrics(1) - 300),
                          300, 300)
+        self.setFixedSize(300, 300)
         # А также его заголовок
         self.setWindowTitle(self.title)
 
