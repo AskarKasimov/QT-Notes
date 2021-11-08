@@ -4,12 +4,10 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QBoxLayout, QDesktopWidget
 from PyQt5.Qt import Qt, QFont
 from PyQt5 import QtGui
-from win32api import GetSystemMetrics
-import random
 
 
 # Унаследуем наш класс от простейшего графического примитива QWidget
-class Example(QWidget):
+class SmartNotes(QWidget):
     def __init__(self):
         # Надо не забыть вызвать инициализатор базового класса
         super().__init__()
@@ -70,7 +68,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     # А теперь создадим и покажем пользователю экземпляр
     # нашего виджета класса Example
-    ex = Example()
+    ex = SmartNotes()
     ex.show()
     # Будем ждать, пока пользователь не завершил исполнение QApplication,
     # а потом завершим и нашу программу
