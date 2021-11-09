@@ -3,12 +3,12 @@ import sqlite3
 from win32api import GetSystemMetrics
 import random
 # Импортируем из PyQt5.QtWidgets классы для создания приложения и виджета
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QDialog
 from PyQt5 import QtGui
 
 
 # Унаследуем наш класс от простейшего графического примитива QWidget
-class Note(QWidget):
+class Note(QDialog):
     def __init__(self, title, author, text, pic, create_time=None, remove_time=None):
         self.title = title
         self.text = text
