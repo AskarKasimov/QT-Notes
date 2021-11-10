@@ -1,10 +1,11 @@
 import sys
 import getpass
+import sqlite3
 from note import Note
 # Импортируем из PyQt5.QtWidgets классы для создания приложения и виджета
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QFileDialog, QDialog, QPlainTextEdit
-from PyQt5.QtWidgets import QVBoxLayout, QBoxLayout, QDesktopWidget, QInputDialog, QLineEdit
+from PyQt5.QtWidgets import QVBoxLayout, QBoxLayout, QDesktopWidget, QInputDialog, QLineEdit, QMessageBox
 from PyQt5.Qt import Qt, QFont
 from PyQt5 import QtGui
 
@@ -82,7 +83,7 @@ class Create_Note(QDialog):
     def __init__(self):
         # Надо не забыть вызвать инициализатор базового класса
         super().__init__()
-        self.path = None
+        self.path = ""
         # В метод initUI() будем выносить всю настройку интерфейса,
         # чтобы не перегружать инициализатор
         self.initUI()
@@ -143,12 +144,33 @@ class Create_Note(QDialog):
 
     def ready(self):
         res, okpressed = QInputDialog.getItem(self, "SmartNotes – Новая заметка",
-                                              "Хотите получить предпросмотр?", ["Да", "Нет"], 0, False)
-        if okpressed and res == "Да":
+                                              "Выберете действие?", ["Предпросмотр", "Создать"], 0, False)
+        if okpressed and res == "Предпросмотр":
             self.newnote = Note(self.title_edit.text(), self.author_edit.text(), self.text_edit.toPlainText(), self.path)
             self.newnote.exec()
-        if okpressed and res == "Нет":
-            pass
+        if okpressed and res == "Создать":
+            con = sqlite3.connect("notes.db")
+            # Создание курсора
+            cur = con.cursor()
+            # Выполнение запроса и получение всех результатов
+            try:
+                cur.execute(f'INSERT INTO notes (noteTitle, noteAuthor) VALUES ("{self.title_edit.text()}", "{self.author_edit.text()}")')
+                con.commit()
+                cur.execute(f'INSERT INTO texts (noteId, noteText, notePic) VALUES ((SELECT last_insert_rowid()), "{self.text_edit.toPlainText()}", "{self.path}")')
+                con.commit()
+                cur.execute(f'INSERT INTO times (noteId, noteCreateTime, noteRemoveTime) VALUES ((SELECT last_insert_rowid()), NULL, NULL)')
+                con.commit()
+                self.msg_box = QMessageBox(self)
+                self.msg_box.setWindowTitle("Успешно!")
+                self.msg_box.setText("Заметка создана!")
+                self.msg_box.exec()
+            except Exception:
+                self.msg_box = QMessageBox(self)
+                self.msg_box.setWindowTitle("Ошибка!")
+                self.msg_box.setText("Заметка не создана!")
+                self.msg_box.exec()
+            # Закрытие подключения
+            con.close()
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ import sqlite3
 from win32api import GetSystemMetrics
 import random
 # Импортируем из PyQt5.QtWidgets классы для создания приложения и виджета
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QDialog
+from PyQt5.QtWidgets import QApplication, QLabel, QDialog
 from PyQt5 import QtGui
 
 
@@ -48,12 +48,14 @@ if __name__ == '__main__':
     # Выполнение запроса и получение всех результатов
     result = cur.execute("""SELECT noteTitle, noteAuthor, noteText, notePic, noteCreateTime, noteRemoveTime FROM notes 
     JOIN texts ON notes.noteId=texts.noteId JOIN times ON notes.noteId=times.noteId""").fetchall()
-    # Запись заметок в список
-    for elem in result:
-        notes.append(Note(elem[0], elem[1], elem[2], elem[3], elem[4], elem[5])) if elem[4] != "NULL" \
-            else notes.append(Note(elem[0], elem[1], elem[2], elem[3]))
     # Закрытие подключения
     con.close()
+    # Запись заметок в список
+    for elem in result:
+        if elem[4] != "NULL":
+            notes.append(Note(elem[0], elem[1], elem[2], elem[3], elem[4], elem[5]))
+        else:
+            notes.append(Note(elem[0], elem[1], elem[2], elem[3]))
     # Вывод всех заметок на экран
     for note in notes:
         note.show()
