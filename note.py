@@ -46,15 +46,12 @@ if __name__ == '__main__':
     # Создание курсора
     cur = con.cursor()
     # Выполнение запроса и получение всех результатов
-    result = cur.execute("""SELECT noteTitle, noteAuthor, noteText, notePic, noteCreateTime, noteRemoveTime FROM notes 
-    JOIN texts ON notes.noteId=texts.noteId JOIN times ON notes.noteId=times.noteId""").fetchall()
+    result = cur.execute("""SELECT noteTitle, noteAuthor, noteText, notePic FROM notes 
+    JOIN texts ON notes.noteId=texts.noteId""").fetchall()
     # Закрытие подключения
     con.close()
     # Запись заметок в список
     for elem in result:
-        if elem[4] != "NULL":
-            notes.append(Note(elem[0], elem[1], elem[2], elem[3], elem[4], elem[5]))
-        else:
             notes.append(Note(elem[0], elem[1], elem[2], elem[3]))
     # Вывод всех заметок на экран
     for note in notes:

@@ -1,13 +1,20 @@
 import sys
 import getpass
 import sqlite3
+import requests
+import shutil
+import os
 from note import Note
 # Импортируем из PyQt5.QtWidgets классы для создания приложения и виджета
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QFileDialog, QDialog, QPlainTextEdit
-from PyQt5.QtWidgets import QVBoxLayout, QBoxLayout, QDesktopWidget, QInputDialog, QLineEdit, QMessageBox
+from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QFileDialog, QDialog, QPlainTextEdit, \
+    QMainWindow, QHBoxLayout, QTableWidgetItem
+from PyQt5.QtWidgets import QVBoxLayout, QBoxLayout, QDesktopWidget, QInputDialog, QLineEdit, QMessageBox, QAction, QTableWidget
 from PyQt5.Qt import Qt, QFont
 from PyQt5 import QtGui
+
+SERVER_IP = "https://vk.com"
+SERVER_PORT = "80"
 
 
 # Функция для центрирования окна по экрану устройства
@@ -31,7 +38,7 @@ class SmartNotes(QWidget):
         self.setGeometry(0, 0, 700, 300)
         center(self)
 
-        self.pixmap = QPixmap("a.png")
+        self.pixmap = QPixmap("logo.png")
         self.image = QLabel(self)
 
         self.setStyleSheet("""
@@ -39,12 +46,14 @@ class SmartNotes(QWidget):
                         font: 75 10pt "Microsoft YaHei UI";
                         font-weight: bold;
                         color: rgb(255, 255, 255);
-                        background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgb(255, 136, 0), stop:1 rgb(250, 200, 0));
+                        background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, 
+                        y2:0, stop:0 rgb(255, 136, 0), stop:1 rgb(250, 200, 0));
                         border-style: solid;
                         border-radius:10px;
                 }
                 QPushButton:hover {
-                            background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgb(255, 170, 0), stop:1 rgb(250, 200, 0));
+                            background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, 
+                            y2:0, stop:0 rgb(255, 170, 0), stop:1 rgb(250, 200, 0));
                         }
                         """)
 
@@ -58,9 +67,9 @@ class SmartNotes(QWidget):
 
         self.btn_new.setFont(QFont("Arial", 15))
         self.btn_new.clicked.connect(self.new_note)
+
         self.btn_del = QPushButton("Изменить заметки")
         self.btn_del.setMinimumSize(200, 35)
-
         self.btn_del.setFont(QFont("Arial", 15))
         self.btn_del.clicked.connect(self.del_note)
 
@@ -74,22 +83,21 @@ class SmartNotes(QWidget):
         self.box_btn.setAlignment(Qt.AlignCenter)
 
         self.box_label = QBoxLayout(1)
-
         self.box_label.addWidget(self.lable_main)
         self.box_label.setAlignment(Qt.AlignCenter)
 
         self.box_box = QVBoxLayout()
         self.box_box.addLayout(self.box_label)
         self.box_box.addLayout(self.box_btn)
-        self.box_label.addWidget(self.image)
         self.box_box.setAlignment(Qt.AlignCenter)
+        self.box_label.addWidget(self.image)
 
         self.setLayout(self.box_box)
         self.image.setPixmap(self.pixmap)
 
     def new_note(self):
-        self.note = CreateNote()
-        self.note.exec()
+            self.note = CreateNote()
+            self.note.exec()
 
     def del_note(self):
         self.note = EditNote()
@@ -179,14 +187,13 @@ class CreateNote(QDialog):
                 cur = con.cursor()
                 # Выполнение запроса и получение всех результатов
                 try:
+                    shutil.copy(self.path, os.getcwd() + "\\note_pics\\" + str(cur.execute("SELECT MAX(noteId) FROM notes").fetchall()[0][0] + 1) + ".png")
+                    self.path = os.getcwd() + "\\note_pics\\" + str(cur.execute("SELECT MAX(noteId) FROM notes").fetchall()[0][0] + 1) + ".png"
                     cur.execute(f'INSERT INTO notes (noteTitle, noteAuthor) VALUES ("{self.title_edit.text()}", '
                                 f'"{self.author_edit.text()}")')
                     con.commit()
                     cur.execute(f'INSERT INTO texts (noteId, noteText, notePic) VALUES ((SELECT last_insert_rowid()), '
                                 f'"{self.text_edit.toPlainText()}", "{self.path}")')
-                    con.commit()
-                    cur.execute(f'INSERT INTO times (noteId, noteCreateTime, noteRemoveTime) '
-                                f'VALUES ((SELECT last_insert_rowid()), NULL, NULL)')
                     con.commit()
                     self.msg_box = QMessageBox(self)
                     self.msg_box.setWindowTitle("Успешно!")
@@ -218,13 +225,140 @@ class EditNote(QDialog):
         self.setWindowIcon(QtGui.QIcon('icon.png'))
         self.setMinimumSize(500, 300)
 
+        self.setStyleSheet("""
+                        QPushButton {
+                                font: 75 10pt "Microsoft YaHei UI";
+                                font-weight: bold;
+                                color: rgb(255, 255, 255);
+                                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, 
+                                y2:0, stop:0 rgb(255, 136, 0), stop:1 rgb(250, 200, 0));
+                                border-style: solid;
+                                border-radius:10px;
+                        }
+                        QPushButton:hover {
+                                    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, 
+                                    y2:0, stop:0 rgb(255, 170, 0), stop:1 rgb(250, 200, 0));
+                                }
+                                """)
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(6)
+        labels = ["Предпросмотр", "ID", "Заголовок", "Текст", "Картинка", "Автор"]
+        self.table.setHorizontalHeaderLabels(labels)
+        self.table.itemChanged.connect(self.item_changed)
+        self.update_data()
+
+        self.btn_update = QPushButton(self)
+        self.btn_update.setIcon(QIcon("update1.png"))
+        self.btn_update.clicked.connect(self.update_data)
+
+        self.btn_save = QPushButton(self)
+        self.btn_save.setIcon(QIcon("save1.png"))
+        self.btn_save.clicked.connect(self.save_data)
+
+        self.box_tools = QHBoxLayout()
+        self.box_tools.addWidget(self.btn_update)
+        self.box_tools.addWidget(self.btn_save)
+
+        self.box_main = QVBoxLayout()
+        self.box_main.addLayout(self.box_tools)
+        self.box_main.addWidget(self.table)
+
+        self.setLayout(self.box_main)
+
+    def update_data(self):
+        con = sqlite3.connect("notes.db")
+        # Создание курсора
+        cur = con.cursor()
+        # Выполнение запроса и получение всех результатов
+        self.result = cur.execute("""SELECT notes.noteId, notes.noteTitle, texts.noteText, texts.notePic, notes.noteAuthor FROM notes
+            JOIN texts ON notes.noteId=texts.noteId""").fetchall()
+        # Закрытие подключения
+        con.close()
+        self.pics = dict()
+        for i in range(len(self.result)):
+            self.pics[i] = self.result[i][3]
+        self.table.setRowCount(len(self.result))
+        for i, elem in enumerate(self.result):
+            for j, val in enumerate(elem):
+                if j == 0:
+                    btn_show = QPushButton(self)
+                    btn_show.setText("Посмотреть " + str(i + 1))
+                    btn_show.clicked.connect(self.showing)
+
+                    self.table.setCellWidget(i, j, btn_show)
+                elif val:
+                    self.table.setItem(i, j, QTableWidgetItem(str(val)))
+                else:
+                    btn_edit = QPushButton(self)
+                    btn_edit.setText("Изменить " + str(i + 1))
+                    btn_edit.clicked.connect(self.picture)
+
+                    self.table.setCellWidget(i, j, btn_edit)
+        self.table.resizeColumnsToContents()
+
+    def item_changed(self, item):
+        pass
+
+    def save_data(self):
+        pass
+
+    def picture(self):
+        self.pics[int(self.sender().text().split()[1])] = QFileDialog.getOpenFileName(self, 'Выбрать картинку', '', 'Картинка (*.jpg);;Картинка (*.jpg);;Картинка (*.png)')[0]
+
+    def check_picture(self):
+        os.startfile(self.pics[int(self.sender().text().split()[1])])
+
+    def showing(self):
+        self.newnote = Note(self.table.item(int(self.sender().text().split()[1]), 2).text(), self.table.item(int(self.sender().text().split()[1]), 5).text(), self.table.item(int(self.sender().text().split()[1]), 3).text(),
+                            self.table.item(int(self.sender().text().split()[1]), 4).text())
+        self.newnote.exec()
+
+class MainApp(QMainWindow):
+    def __init__(self):
+        # Надо не забыть вызвать инициализатор базового класса
+        super().__init__()
+        # В метод initUI() будем выносить всю настройку интерфейса,
+        # чтобы не перегружать инициализатор
+        self.initUI()
+
+    def initUI(self):
+        self.setGeometry(0, 0, 700, 300)
+        center(self)
+        self.setWindowTitle("SmartNotes")
+        self.setWindowIcon(QtGui.QIcon('icon.png'))
+        self.setMinimumSize(700, 300)
+
+        self.menubar = self.menuBar()
+        self.fileMenu = self.menubar.addMenu('&Настройки')
+        self.save = QAction("Оцените приложение", self)
+        self.fileMenu.addAction(self.save)
+        self.save.triggered.connect(self.rating)
+
+    def rating(self):
+        rate, ok = QInputDialog.getInt(self, 'Оцените SmartNotes', 'Введите оценку от 1 до 5', 0, 1, 5)
+        if ok:
+            req = requests.get(SERVER_IP+"/rateapp?rating=" + str(rate), SERVER_PORT)
+            if req.status_code == 200:
+                self.msg_box = QMessageBox(self)
+                self.msg_box.setWindowTitle("Успешно!")
+                self.msg_box.setText("Ваш отзыв был отправлен!")
+                self.msg_box.exec()
+            else:
+                self.msg_box = QMessageBox(self)
+                self.msg_box.setWindowTitle("Ошибка!")
+                self.msg_box.setText("Отсутствует связь с сервером, попробоуйте позже.")
+                self.msg_box.exec()
+
 
 if __name__ == '__main__':
     # Создадим класс приложения PyQT
     app = QApplication(sys.argv)
     # А теперь создадим и покажем пользователю экземпляр
     # нашего виджета класса Example
-    ex = SmartNotes()
+    ex = MainApp()
+    notess = SmartNotes()
+    ex.setCentralWidget(notess)
     ex.show()
     # Будем ждать, пока пользователь не завершил исполнение QApplication,
     # а потом завершим и нашу программу
