@@ -1,5 +1,7 @@
 import sys
 import sqlite3
+
+from PyQt5.QtGui import QPixmap
 from win32api import GetSystemMetrics
 import random
 # Импортируем из PyQt5.QtWidgets классы для создания приложения и виджета
@@ -34,6 +36,10 @@ class Note(QDialog):
         self.label_text = QLabel(self)
         self.label_text.move(1, 1)
         self.label_text.setText("\n".join(self.text.split("\\n")))
+
+        self.label = QLabel(self)
+        self.pixmap = QPixmap(self.pic)
+        self.label.setPixmap(self.pixmap)
 
 
 if __name__ == '__main__':

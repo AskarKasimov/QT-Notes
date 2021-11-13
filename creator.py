@@ -13,8 +13,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QBoxLayout, QDesktopWidget, QInputDialo
 from PyQt5.Qt import Qt, QFont
 from PyQt5 import QtGui
 
-SERVER_IP = "https://vk.com"
-SERVER_PORT = "80"
+SERVER_IP = "http://192.168.1.39:5000"
 
 
 # Функция для центрирования окна по экрану устройства
@@ -96,8 +95,8 @@ class SmartNotes(QWidget):
         self.image.setPixmap(self.pixmap)
 
     def new_note(self):
-            self.note = CreateNote()
-            self.note.exec()
+        self.note = CreateNote()
+        self.note.exec()
 
     def del_note(self):
         self.note = EditNote()
@@ -280,14 +279,13 @@ class EditNote(QDialog):
             self.pics[i] = self.result[i][3]
         self.table.setRowCount(len(self.result))
         for i, elem in enumerate(self.result):
-            for j, val in enumerate(elem):
-                if j == 0:
-                    btn_show = QPushButton(self)
-                    btn_show.setText("Посмотреть " + str(i + 1))
-                    btn_show.clicked.connect(self.showing)
+            self.btn_show = QPushButton(self)
+            self.btn_show.setText("Посмотреть " + str(i + 1))
+            self.btn_show.clicked.connect(self.showing)
 
-                    self.table.setCellWidget(i, j, btn_show)
-                elif val:
+            self.table.setCellWidget(i, 0, self.btn_show)
+            for j, val in enumerate(elem, 1):
+                if val:
                     self.table.setItem(i, j, QTableWidgetItem(str(val)))
                 else:
                     btn_edit = QPushButton(self)
@@ -304,15 +302,18 @@ class EditNote(QDialog):
         pass
 
     def picture(self):
-        self.pics[int(self.sender().text().split()[1])] = QFileDialog.getOpenFileName(self, 'Выбрать картинку', '', 'Картинка (*.jpg);;Картинка (*.jpg);;Картинка (*.png)')[0]
+        self.pics[int(self.sender().text().split()[1]) - 1] = QFileDialog.getOpenFileName(self, 'Выбрать картинку', '', 'Картинка (*.jpg);;Картинка (*.jpg);;Картинка (*.png)')[0]
 
     def check_picture(self):
         os.startfile(self.pics[int(self.sender().text().split()[1])])
 
     def showing(self):
-        self.newnote = Note(self.table.item(int(self.sender().text().split()[1]), 2).text(), self.table.item(int(self.sender().text().split()[1]), 5).text(), self.table.item(int(self.sender().text().split()[1]), 3).text(),
-                            self.table.item(int(self.sender().text().split()[1]), 4).text())
+        self.newnote = Note(self.table.item(int(self.sender().text().split()[1]) - 1, 2).text(),
+                            self.table.item(int(self.sender().text().split()[1]) - 1, 5).text(),
+                            self.table.item(int(self.sender().text().split()[1]) - 1, 3).text(),
+                            self.pics[int(self.sender().text().split()[1]) - 1])
         self.newnote.exec()
+
 
 class MainApp(QMainWindow):
     def __init__(self):
@@ -330,15 +331,21 @@ class MainApp(QMainWindow):
         self.setMinimumSize(700, 300)
 
         self.menubar = self.menuBar()
-        self.fileMenu = self.menubar.addMenu('&Настройки')
-        self.save = QAction("Оцените приложение", self)
-        self.fileMenu.addAction(self.save)
-        self.save.triggered.connect(self.rating)
+
+        self.settingsMenu = self.menubar.addMenu('&Настройки')
+        self.rate = QAction("Оцените приложение", self)
+        self.settingsMenu.addAction(self.rate)
+
+        self.run = QAction("Запустить заметки", self)
+        self.settingsMenu.addAction(self.run)
+
+        self.run.triggered.connect(self.runapp)
+        self.rate.triggered.connect(self.rating)
 
     def rating(self):
         rate, ok = QInputDialog.getInt(self, 'Оцените SmartNotes', 'Введите оценку от 1 до 5', 0, 1, 5)
         if ok:
-            req = requests.get(SERVER_IP+"/rateapp?rating=" + str(rate), SERVER_PORT)
+            req = requests.get(SERVER_IP+"/rateapp?rating=" + str(rate))
             if req.status_code == 200:
                 self.msg_box = QMessageBox(self)
                 self.msg_box.setWindowTitle("Успешно!")
@@ -349,6 +356,25 @@ class MainApp(QMainWindow):
                 self.msg_box.setWindowTitle("Ошибка!")
                 self.msg_box.setText("Отсутствует связь с сервером, попробоуйте позже.")
                 self.msg_box.exec()
+
+    def runapp(self):
+        # Список со всеми заметками
+        self.notes = list()
+        # Подключение к БД
+        con = sqlite3.connect("notes.db")
+        # Создание курсора
+        cur = con.cursor()
+        # Выполнение запроса и получение всех результатов
+        result = cur.execute("""SELECT noteTitle, noteAuthor, noteText, notePic FROM notes 
+            JOIN texts ON notes.noteId=texts.noteId""").fetchall()
+        # Закрытие подключения
+        con.close()
+        # Запись заметок в список
+        for elem in result:
+            self.notes.append(Note(elem[0], elem[1], elem[2], elem[3]))
+        # Вывод всех заметок на экран
+        for self.note in self.notes:
+            self.note.show()
 
 
 if __name__ == '__main__':
