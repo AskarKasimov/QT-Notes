@@ -1,6 +1,6 @@
 import sys
 import sqlite3
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QFont
 from win32api import GetSystemMetrics
 import random
 from PyQt5.QtWidgets import QApplication, QLabel, QDialog, QVBoxLayout
@@ -25,19 +25,24 @@ class Note(QDialog):
                          300, 300)
         self.setFixedSize(300, 300)
         self.setWindowIcon(QtGui.QIcon('icon.png'))
-        self.setWindowTitle(self.title)
+        self.setWindowTitle("SmartNotes – " + self.title)
+
+        self.label_title = QLabel(self)
+        self.label_title.setText(self.title)
+        self.label_title.setFont(QFont("Courier New", 30))
 
         self.label_text = QLabel(self)
-        self.label_text.move(1, 1)
         self.label_text.setText("\n".join(self.text.split("\\n")))
 
-        self.label = QLabel(self)
-        self.pixmap = QPixmap(self.pic)
-        self.label.setPixmap(self.pixmap)
-
         self.box = QVBoxLayout()
-        self.box.addWidget(self.label)
+        self.box.addWidget(self.label_title)
         self.box.addWidget(self.label_text)
+
+        if self.pic != "":
+            self.label = QLabel(self)
+            self.pixmap = QPixmap(self.pic)
+            self.label.setPixmap(self.pixmap)
+            self.box.addWidget(self.label)
 
         self.setLayout(self.box)
 
@@ -49,7 +54,7 @@ if __name__ == '__main__':
     con = sqlite3.connect("notes.db")
     cur = con.cursor()
     result = cur.execute("""SELECT noteTitle, noteAuthor, noteText, notePic FROM notes 
-    JOIN texts ON notes.noteId=texts.noteId""").fetchall()
+    JOIN texts ON notes.noteId=texts.noteId WHERE notes.noteId != 0""").fetchall()
     con.close()
     for elem in result:
             notes.append(Note(elem[0], elem[1], elem[2], elem[3]))

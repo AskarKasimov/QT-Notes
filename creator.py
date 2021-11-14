@@ -16,9 +16,9 @@ from PyQt5 import QtGui
 # Константы
 SERVER_IP = "http://192.168.1.39:5000"  # IP запущенного сервера с рейтингом
 # Названия столбцов таблицы
-LABELS = ["Предпросмотр", "ID", "Заголовок", "Текст", "Картинка", "Автор"]
+LABELS = ["Предпросмотр", "Удаление", "ID", "Заголовок", "Текст", "Картинка", "Автор"]
 # Названия столбцов базы данных
-SQL_LABELS = [None, None, "noteTitle", "noteText", "notePic", "noteAuthor"]
+SQL_LABELS = ["", "", "", "noteTitle", "noteText", "notePic", "noteAuthor"]
 
 
 # Функция для центрирования окна по экрану устройства
@@ -193,32 +193,30 @@ class CreateNote(QDialog):
                 # Коннект к базе данных для создания заметки
                 con = sqlite3.connect("notes.db")
                 cur = con.cursor()
-                try:
-                    if self.path != "":
-                        shutil.copy(self.path, os.getcwd() + "\\note_pics\\" +
-                                    str(cur.execute("SELECT MAX(noteId) FROM notes").
-                                        fetchall()[0][0] + 1) + ".png")
-                        self.path = "note_pics\\" + \
-                                    str(cur.execute("SELECT MAX(noteId) FROM notes").
-                                        fetchall()[0][0] + 1) + ".png"
-                    cur.execute(f'INSERT INTO notes (noteTitle, noteAuthor) '
-                                f'VALUES ("{self.title_edit.text()}", '
-                                f'"{self.author_edit.text()}")')
-                    con.commit()
-                    cur.execute(f'INSERT INTO texts (noteId, noteText, notePic) '
-                                f'VALUES ((SELECT last_insert_rowid()), '
-                                f'"{self.text_edit.toPlainText()}", "{self.path}")')
-                    con.commit()
-                    self.msg_box = QMessageBox(self)
-                    self.msg_box.setWindowTitle("Успешно!")
-                    self.msg_box.setText("Заметка создана!")
-                    self.msg_box.exec()
-                except Exception:
-                    # Исключение на всякий случай
-                    self.msg_box = QMessageBox(self)
-                    self.msg_box.setWindowTitle("Ошибка!")
-                    self.msg_box.setText("Заметка не создана!")
-                    self.msg_box.exec()
+                # try:
+                if self.path != "":
+                    request = cur.execute("SELECT MAX(noteId) from notes").fetchall()
+                    if request:
+                        shutil.copy(self.path, os.getcwd() + "\\note_pics\\" + str(int(request[0][0]) + 1) + ".png")
+                        self.path = "note_pics\\" + str(int(request[0][0]) + 1) + ".png"
+                cur.execute(f'INSERT INTO notes (noteTitle, noteAuthor) '
+                            f'VALUES ("{self.title_edit.text()}", '
+                            f'"{self.author_edit.text()}")')
+                con.commit()
+                cur.execute(f'INSERT INTO texts (noteId, noteText, notePic) '
+                            f'VALUES ((SELECT MAX(noteId) from notes), '
+                            f'"{self.text_edit.toPlainText()}", "{self.path}")')
+                con.commit()
+                self.msg_box = QMessageBox(self)
+                self.msg_box.setWindowTitle("Успешно!")
+                self.msg_box.setText("Заметка создана!")
+                self.msg_box.exec()
+                # except Exception:
+                #     # Исключение на всякий случай
+                #     self.msg_box = QMessageBox(self)
+                #     self.msg_box.setWindowTitle("Ошибка!")
+                #     self.msg_box.setText("Заметка не создана!")
+                #     self.msg_box.exec()
                 con.close()
 
 
@@ -230,7 +228,7 @@ class EditNote(QDialog):
 
     def initui(self):
         # Настройка окна
-        self.setGeometry(0, 0, 500, 300)
+        self.setGeometry(0, 0, 600, 300)
         center(self)
         self.setWindowTitle("SmartNotes – Изменить заметки")
         self.setWindowIcon(QtGui.QIcon('icon.png'))
@@ -254,7 +252,7 @@ class EditNote(QDialog):
                                 """)
 
         self.table = QTableWidget(self)
-        self.table.setColumnCount(6)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(LABELS)
         self.update_data()
 
@@ -278,7 +276,7 @@ class EditNote(QDialog):
         cur = con.cursor()
         result = cur.execute("""SELECT notes.noteId, notes.noteTitle, 
         texts.noteText, texts.notePic, notes.noteAuthor FROM notes
-            JOIN texts ON notes.noteId=texts.noteId""").fetchall()
+            JOIN texts ON notes.noteId=texts.noteId WHERE notes.noteId != 0""").fetchall()
         con.close()
         # Словарь, который хранит картинки заметок
         self.pics = dict()
@@ -295,8 +293,15 @@ class EditNote(QDialog):
             self.btn_show.clicked.connect(self.showing)
 
             self.table.setCellWidget(i, 0, self.btn_show)
-            for j, val in enumerate(elem, 1):
-                if j == 4:
+
+            # Создание диалогового окна изменения картинки заметки
+            self.btn_del = QPushButton(self)
+            self.btn_del.setText("Удалить  " + str(i + 1))
+            self.btn_del.clicked.connect(self.delete)
+
+            self.table.setCellWidget(i, 1, self.btn_del)
+            for j, val in enumerate(elem, 2):
+                if j == 5:
                     # Создание диалогового окна изменения картинки заметки
                     btn_edit = QPushButton(self)
                     btn_edit.setText("Изменить " + str(i + 1))
@@ -305,6 +310,8 @@ class EditNote(QDialog):
                     self.table.setCellWidget(i, j, btn_edit)
                 else:
                     self.table.setItem(i, j, QTableWidgetItem(str(val)))
+                    if j == 2:
+                        self.table.item(i, j).setFlags(Qt.ItemIsEnabled)
         self.table.resizeColumnsToContents()
         self.table.itemChanged.connect(self.item_changed)
 
@@ -316,14 +323,15 @@ class EditNote(QDialog):
             # Коннект к базе данных для изменения заметок
             con = sqlite3.connect("notes.db")
             cur = con.cursor()
-            if item.column() == 2 or item.column() == 5:
+            if item.column() == 3 or item.column() == 6:
                 cur.execute(f"UPDATE notes SET {SQL_LABELS[item.column()]} = "
-                            f"'{item.text()}' WHERE noteId = {self.table.item(item.row(), 1).text()}")
+                            f"'{item.text()}' WHERE noteId = {self.table.item(item.row(), 2).text()}")
             else:
                 cur.execute(f"UPDATE texts SET {SQL_LABELS[item.column()]} = "
-                            f"'{item.text()}' WHERE noteId = {self.table.item(item.row(), 1).text()}")
+                            f"'{item.text()}' WHERE noteId = {self.table.item(item.row(), 2).text()}")
             con.commit()
             con.close()
+        self.update_data()
 
     def picture(self):
         self.pics[int(self.sender().text().split()[1]) - 1] = \
@@ -333,13 +341,33 @@ class EditNote(QDialog):
         con = sqlite3.connect("notes.db")
         cur = con.cursor()
         cur.execute(f"UPDATE texts SET notePic = '{self.pics[int(self.sender().text().split()[1]) - 1]}'"
-                    f" WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 1).text()}")
+                    f" WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 2).text()}")
         con.commit()
+        con.close()
+
+    def delete(self):
+        descision, okpressed = QInputDialog.getItem(self,
+                                                  "SmartNotes – Удаление заметок",
+                                                  "Вы действительно хотите удалить заметку?",
+                                                  ["Да", "Нет"], 0, False)
+        if okpressed and descision == "Да":
+            con = sqlite3.connect("notes.db")
+            cur = con.cursor()
+            cur.execute(f"DELETE FROM texts WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 2).text()}")
+            con.commit()
+            cur.execute(f"DELETE FROM notes WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 2).text()}")
+            con.commit()
+            con.close()
+            try:
+                os.remove(os.getcwd() + "\\note_pics\\" + self.table.item(int(self.sender().text().split()[1]) - 1, 2).text() + ".png")
+            except:
+                pass
+        self.update_data()
 
     def showing(self):
-        self.newnote = Note(self.table.item(int(self.sender().text().split()[1]) - 1, 2).text(),
-                            self.table.item(int(self.sender().text().split()[1]) - 1, 5).text(),
-                            self.table.item(int(self.sender().text().split()[1]) - 1, 3).text(),
+        self.newnote = Note(self.table.item(int(self.sender().text().split()[1]) - 1, 3).text(),
+                            self.table.item(int(self.sender().text().split()[1]) - 1, 6).text(),
+                            self.table.item(int(self.sender().text().split()[1]) - 1, 4).text(),
                             self.pics[int(self.sender().text().split()[1]) - 1])
         self.newnote.exec()
 
@@ -392,7 +420,7 @@ class MainApp(QMainWindow):
         con = sqlite3.connect("notes.db")
         cur = con.cursor()
         result = cur.execute("""SELECT noteTitle, noteAuthor, noteText, notePic FROM notes 
-            JOIN texts ON notes.noteId=texts.noteId""").fetchall()
+            JOIN texts ON notes.noteId=texts.noteId WHERE notes.noteId != 0""").fetchall()
         con.close()
         # Запись заметок в список
         for elem in result:
