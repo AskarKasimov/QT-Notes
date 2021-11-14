@@ -1,15 +1,13 @@
 import sys
 import sqlite3
-
 from PyQt5.QtGui import QPixmap
 from win32api import GetSystemMetrics
 import random
-# Импортируем из PyQt5.QtWidgets классы для создания приложения и виджета
-from PyQt5.QtWidgets import QApplication, QLabel, QDialog
+from PyQt5.QtWidgets import QApplication, QLabel, QDialog, QVBoxLayout
 from PyQt5 import QtGui
 
 
-# Унаследуем наш класс от простейшего графического примитива QWidget
+# Класс окна заметок
 class Note(QDialog):
     def __init__(self, title, author, text, pic, create_time=None, remove_time=None):
         self.title = title
@@ -18,19 +16,15 @@ class Note(QDialog):
         self.author = author
         self.create_time = create_time
         self.remove_time = remove_time
-        # Надо не забыть вызвать инициализатор базового класса
         super().__init__()
-        # В метод initUI() будем выносить всю настройку интерфейса,
-        # чтобы не перегружать инициализатор
-        self.initUI()
+        self.initui()
 
-    def initUI(self):
-        # Зададим размер и положение нашего виджета,
+    def initui(self):
+        # Настройка окна и создание виджетов
         self.setGeometry(random.randint(0, GetSystemMetrics(0) - 300), random.randint(0, GetSystemMetrics(1) - 300),
                          300, 300)
         self.setFixedSize(300, 300)
         self.setWindowIcon(QtGui.QIcon('icon.png'))
-        # А также его заголовок
         self.setWindowTitle(self.title)
 
         self.label_text = QLabel(self)
@@ -41,27 +35,25 @@ class Note(QDialog):
         self.pixmap = QPixmap(self.pic)
         self.label.setPixmap(self.pixmap)
 
+        self.box = QVBoxLayout()
+        self.box.addWidget(self.label)
+        self.box.addWidget(self.label_text)
+
+        self.setLayout(self.box)
+
 
 if __name__ == '__main__':
-    # Список со всеми заметками
     notes = list()
-    # Создадим класс приложения PyQT
     app = QApplication(sys.argv)
     # Подключение к БД
     con = sqlite3.connect("notes.db")
-    # Создание курсора
     cur = con.cursor()
-    # Выполнение запроса и получение всех результатов
     result = cur.execute("""SELECT noteTitle, noteAuthor, noteText, notePic FROM notes 
     JOIN texts ON notes.noteId=texts.noteId""").fetchall()
-    # Закрытие подключения
     con.close()
-    # Запись заметок в список
     for elem in result:
             notes.append(Note(elem[0], elem[1], elem[2], elem[3]))
     # Вывод всех заметок на экран
     for note in notes:
         note.show()
-    # Будем ждать, пока пользователь не завершил исполнение QApplication,
-    # а потом завершим и нашу программу
     sys.exit(app.exec())

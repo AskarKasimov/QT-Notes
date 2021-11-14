@@ -15,7 +15,8 @@ def index():
             count = 0
             total = 0
     with open("rates.txt", "w") as file:
-        file.write(str(float((int(request.args.get("rating")) + total) / (count + 1))) + " " + str(count + 1) + " " + str(int(request.args.get("rating")) + total))
+        file.write(str(float((int(request.args.get("rating")) + total) / (count + 1))) + " " +
+                   str(count + 1) + " " + str(int(request.args.get("rating")) + total))
     return "Success!"
 
 
