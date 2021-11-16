@@ -171,7 +171,7 @@ class CreateNote(QDialog):
     def picture(self):
         self.path = QFileDialog.getOpenFileName(self,
                                                 'Выбрать картинку', '',
-                                                'Картинка (*.jpg);;Картинка (*.jpg);;Картинка (*.png)')[0]
+                                                'Картинка (*.png *jpg *jpeg)')[0]
 
     def ready(self):
         # Проверка на заполнение полей
@@ -350,7 +350,7 @@ class EditNote(QDialog):
     def picture(self):
         self.pics[int(self.sender().text().split()[1]) - 1] = \
             QFileDialog.getOpenFileName(self, 'Выбрать картинку', '',
-                                        'Картинка (*.jpg);;Картинка (*.jpg);;Картинка (*.png)')[0]
+                                        'Картинка (*.png *jpg *jpeg)')[0]
         shutil.copy(self.pics[int(self.sender().text().split()[1]) - 1],
                     os.getcwd() + "\\note_pics\\" + self.table.item(int(self.sender().text().split()[1]) - 1,
                                                                     2).text() + ".png")
