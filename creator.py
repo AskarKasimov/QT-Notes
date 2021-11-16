@@ -2,19 +2,21 @@ import sys
 import getpass
 import sqlite3
 import requests
+from PIL import Image
 import shutil
 import os
-from note import Note
+from PyQt5 import QtCore
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QFileDialog, QDialog, QPlainTextEdit, \
     QMainWindow, QHBoxLayout, QTableWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout, QBoxLayout, QDesktopWidget, QInputDialog, QLineEdit, QMessageBox, \
     QAction, QTableWidget
 from PyQt5.Qt import Qt, QFont
-from PyQt5 import QtGui
+from win32api import GetSystemMetrics
+import random
 
 # Константы
-SERVER_IP = "http://192.168.1.39:5000"  # IP запущенного сервера с рейтингом
+SERVER_IP = "http://192.168.1.159:5000"  # IP запущенного сервера с рейтингом
 # Названия столбцов таблицы
 LABELS = ["Предпросмотр", "Удаление", "ID", "Заголовок", "Текст", "Картинка", "Автор"]
 # Названия столбцов базы данных
@@ -61,7 +63,7 @@ class SmartNotes(QWidget):
 
         # Настройка окна и создание виджетов
         self.setWindowTitle("SmartNotes")
-        self.setWindowIcon(QtGui.QIcon('icon.png'))
+        self.setWindowIcon(QIcon('icon.png'))
         self.setMinimumSize(700, 300)
 
         self.btn_new = QPushButton("Новая заметка")
@@ -120,7 +122,7 @@ class CreateNote(QDialog):
 
         # Настройка окна и создание виджетов
         self.setWindowTitle("SmartNotes – Новая заметка")
-        self.setWindowIcon(QtGui.QIcon('icon.png'))
+        self.setWindowIcon(QIcon('icon.png'))
         self.setMinimumSize(500, 300)
 
         self.title_lable = QLabel(self)
@@ -185,38 +187,50 @@ class CreateNote(QDialog):
                                                   "Выберете действие:",
                                                   ["Предпросмотр", "Создать"], 0, False)
             if okpressed and res == "Предпросмотр":
+                self.img = Image.open(self.path)
+                h, w = self.img.size
+                scale = 250 / h
+                self.img = self.img.resize((int(h * scale), int(w * scale)), Image.ANTIALIAS)
+                self.img.save(self.path)
+
                 self.newnote = Note(self.title_edit.text(),
                                     self.author_edit.text(), self.text_edit.toPlainText(),
-                                    self.path)
+                                    self.path, False)
                 self.newnote.exec()
             if okpressed and res == "Создать":
                 # Коннект к базе данных для создания заметки
                 con = sqlite3.connect("notes.db")
                 cur = con.cursor()
-                # try:
-                if self.path != "":
-                    request = cur.execute("SELECT MAX(noteId) from notes").fetchall()
-                    if request:
-                        shutil.copy(self.path, os.getcwd() + "\\note_pics\\" + str(int(request[0][0]) + 1) + ".png")
-                        self.path = "note_pics\\" + str(int(request[0][0]) + 1) + ".png"
-                cur.execute(f'INSERT INTO notes (noteTitle, noteAuthor) '
-                            f'VALUES ("{self.title_edit.text()}", '
-                            f'"{self.author_edit.text()}")')
-                con.commit()
-                cur.execute(f'INSERT INTO texts (noteId, noteText, notePic) '
-                            f'VALUES ((SELECT MAX(noteId) from notes), '
-                            f'"{self.text_edit.toPlainText()}", "{self.path}")')
-                con.commit()
-                self.msg_box = QMessageBox(self)
-                self.msg_box.setWindowTitle("Успешно!")
-                self.msg_box.setText("Заметка создана!")
-                self.msg_box.exec()
-                # except Exception:
-                #     # Исключение на всякий случай
-                #     self.msg_box = QMessageBox(self)
-                #     self.msg_box.setWindowTitle("Ошибка!")
-                #     self.msg_box.setText("Заметка не создана!")
-                #     self.msg_box.exec()
+                try:
+                    if self.path != "":
+                        request = cur.execute("SELECT MAX(noteId) from notes").fetchall()
+                        if request:
+                            shutil.copy(self.path, os.getcwd() + "\\note_pics\\" + str(int(request[0][0]) + 1) + ".png")
+                            self.path = "note_pics\\" + str(int(request[0][0]) + 1) + ".png"
+                            self.img = Image.open(self.path)
+                            h, w = self.img.size
+                            scale = 250 / h
+                            self.img = self.img.resize((int(h * scale), int(w * scale)), Image.ANTIALIAS)
+                            self.img.save(self.path)
+
+                    cur.execute(f'INSERT INTO notes (noteTitle, noteAuthor) '
+                                f'VALUES ("{self.title_edit.text()}", '
+                                f'"{self.author_edit.text()}")')
+                    con.commit()
+                    cur.execute(f'INSERT INTO texts (noteId, noteText, notePic) '
+                                f'VALUES ((SELECT MAX(noteId) from notes), '
+                                f'"{self.text_edit.toPlainText()}", "{self.path}")')
+                    con.commit()
+                    self.msg_box = QMessageBox(self)
+                    self.msg_box.setWindowTitle("Успешно!")
+                    self.msg_box.setText("Заметка создана!")
+                    self.msg_box.exec()
+                except Exception:
+                    # Исключение на всякий случай
+                    self.msg_box = QMessageBox(self)
+                    self.msg_box.setWindowTitle("Ошибка!")
+                    self.msg_box.setText("Заметка не создана!")
+                    self.msg_box.exec()
                 con.close()
 
 
@@ -231,7 +245,7 @@ class EditNote(QDialog):
         self.setGeometry(0, 0, 600, 300)
         center(self)
         self.setWindowTitle("SmartNotes – Изменить заметки")
-        self.setWindowIcon(QtGui.QIcon('icon.png'))
+        self.setWindowIcon(QIcon('icon.png'))
         self.setMinimumSize(500, 300)
 
         # CSS-код для красивых градиентных кнопок
@@ -337,6 +351,18 @@ class EditNote(QDialog):
         self.pics[int(self.sender().text().split()[1]) - 1] = \
             QFileDialog.getOpenFileName(self, 'Выбрать картинку', '',
                                         'Картинка (*.jpg);;Картинка (*.jpg);;Картинка (*.png)')[0]
+        shutil.copy(self.pics[int(self.sender().text().split()[1]) - 1],
+                    os.getcwd() + "\\note_pics\\" + self.table.item(int(self.sender().text().split()[1]) - 1,
+                                                                    2).text() + ".png")
+        self.pics[int(self.sender().text().split()[1]) - 1] = "note_pics\\" + self.table.item(
+            int(self.sender().text().split()[1]) - 1, 2).text() + ".png"
+
+        self.img = Image.open(self.pics[int(self.sender().text().split()[1]) - 1])
+        h, w = self.img.size
+        scale = 250 / h
+        self.img = self.img.resize((int(h * scale), int(w * scale)), Image.ANTIALIAS)
+        self.img.save(self.pics[int(self.sender().text().split()[1]) - 1])
+
         # Коннект к базе данных для изменения картинки
         con = sqlite3.connect("notes.db")
         cur = con.cursor()
@@ -347,19 +373,22 @@ class EditNote(QDialog):
 
     def delete(self):
         descision, okpressed = QInputDialog.getItem(self,
-                                                  "SmartNotes – Удаление заметок",
-                                                  "Вы действительно хотите удалить заметку?",
-                                                  ["Да", "Нет"], 0, False)
+                                                    "SmartNotes – Удаление заметок",
+                                                    "Вы действительно хотите удалить заметку?",
+                                                    ["Да", "Нет"], 0, False)
         if okpressed and descision == "Да":
             con = sqlite3.connect("notes.db")
             cur = con.cursor()
-            cur.execute(f"DELETE FROM texts WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 2).text()}")
+            cur.execute(
+                f"DELETE FROM texts WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 2).text()}")
             con.commit()
-            cur.execute(f"DELETE FROM notes WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 2).text()}")
+            cur.execute(
+                f"DELETE FROM notes WHERE noteId = {self.table.item(int(self.sender().text().split()[1]) - 1, 2).text()}")
             con.commit()
             con.close()
             try:
-                os.remove(os.getcwd() + "\\note_pics\\" + self.table.item(int(self.sender().text().split()[1]) - 1, 2).text() + ".png")
+                os.remove(os.getcwd() + "\\note_pics\\" + self.table.item(int(self.sender().text().split()[1]) - 1,
+                                                                          2).text() + ".png")
             except:
                 pass
         self.update_data()
@@ -368,7 +397,8 @@ class EditNote(QDialog):
         self.newnote = Note(self.table.item(int(self.sender().text().split()[1]) - 1, 3).text(),
                             self.table.item(int(self.sender().text().split()[1]) - 1, 6).text(),
                             self.table.item(int(self.sender().text().split()[1]) - 1, 4).text(),
-                            self.pics[int(self.sender().text().split()[1]) - 1])
+                            self.pics[int(self.sender().text().split()[1]) - 1],
+                            False)
         self.newnote.exec()
 
 
@@ -382,7 +412,7 @@ class MainApp(QMainWindow):
         self.setGeometry(0, 0, 700, 300)
         center(self)
         self.setWindowTitle("SmartNotes")
-        self.setWindowIcon(QtGui.QIcon('icon.png'))
+        self.setWindowIcon(QIcon('icon.png'))
         self.setMinimumSize(700, 300)
 
         # Меню-бар для некоторых функций
@@ -428,6 +458,83 @@ class MainApp(QMainWindow):
         # Вывод всех заметок на экран
         for self.note in self.notes:
             self.note.show()
+
+
+# Класс окна заметок
+class Note(QDialog):
+    def __init__(self, title, author, text, pic, pinned=True):
+        self.title = title
+        self.text = text
+        self.pic = pic
+        self.author = author
+        self.pinned = pinned
+        super().__init__()
+        self.initui()
+
+    def initui(self):
+        # Настройка окна и создание виджетов
+        self.setGeometry(random.randint(0, GetSystemMetrics(0) - 500), random.randint(0, GetSystemMetrics(1) - 500),
+                         300, 300)
+        self.adjustSize()
+        self.setWindowIcon(QIcon('icon.png'))
+        self.setWindowTitle("SmartNotes – " + self.title)
+        self.setWindowFlag(QtCore.Qt.Dialog)
+        self.count = 0
+
+        # CSS-код для красивых градиентных кнопок
+        self.setStyleSheet("""
+                        QPushButton {
+                                font: 75 10pt "Microsoft YaHei UI";
+                                font-weight: bold;
+                                color: rgb(255, 255, 255);
+                                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, 
+                                y2:0, stop:0 rgb(255, 136, 0), stop:1 rgb(250, 200, 0));
+                                border-style: solid;
+                                border-radius:10px;
+                        }
+                        QPushButton:hover {
+                                    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, 
+                                    y2:0, stop:0 rgb(255, 170, 0), stop:1 rgb(250, 200, 0));
+                                }
+                                """)
+
+        self.label_title = QLabel(self)
+        self.label_title.setText(self.title)
+        self.label_title.setFont(QFont("Courier New", 30))
+
+        self.label_text = QLabel(self)
+        self.label_text.setText("\n".join(self.text.split("\\n")))
+
+        self.box = QVBoxLayout()
+        self.box.addWidget(self.label_title)
+        self.box.addWidget(self.label_text)
+
+        if self.pic != "":
+            self.label = QLabel(self)
+            self.pixmap = QPixmap(self.pic)
+            self.label.setPixmap(self.pixmap)
+            self.box.addWidget(self.label)
+
+        if self.pinned:
+            self.btn_pin = QPushButton(self)
+            self.btn_pin.setText("Закрепить")
+            self.btn_pin.clicked.connect(self.pin)
+            self.box.addWidget(self.btn_pin)
+
+        self.setLayout(self.box)
+
+    def pin(self):
+        if self.count % 2 == 0:
+            self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
+            self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.Dialog)
+            self.sender().setText("Открепить")
+        else:
+            self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
+            self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.FramelessWindowHint)
+            self.setWindowFlags(QtCore.Qt.Dialog)
+            self.sender().setText("Закрепить")
+        self.count += 1
+        self.show()
 
 
 if __name__ == '__main__':
